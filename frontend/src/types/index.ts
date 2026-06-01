@@ -47,6 +47,12 @@ export interface SyncStatusSummary {
   syncFailureCount: number;
 }
 
+export interface SalesforceAuthStatus {
+  connected: boolean;
+  instanceUrl: string;
+  expiresAt: string;
+}
+
 export interface LiveCdcEvent {
   id: string;
   eventTime: string;

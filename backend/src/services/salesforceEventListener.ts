@@ -8,6 +8,7 @@ import { logSyncEvent } from "./syncLogger.js";
 import { withSalesforce } from "./salesforceClient.js";
 import { salesforceAuthService } from "./salesforceAuthService.js";
 import { appToSalesforceSyncService } from "./appToSalesforceSyncService.js";
+import { SALESFORCE_CDC_CHANNELS, SALESFORCE_OBJECTS, SALESFORCE_ORDER_FIELDS } from "../config/salesforceSchema.js";
 
 export class SalesforceEventListener {
   private started = false;
@@ -18,8 +19,8 @@ export class SalesforceEventListener {
 
     try {
       const conn = await salesforceAuthService.getConnection();
-      this.subscribe(conn, "/data/ContactChangeEvent", "Contact");
-      this.subscribe(conn, "/data/Order__ChangeEvent", "Order__c");
+      this.subscribe(conn, SALESFORCE_CDC_CHANNELS.contact, SALESFORCE_OBJECTS.contact);
+      this.subscribe(conn, SALESFORCE_CDC_CHANNELS.order, SALESFORCE_OBJECTS.order);
     } catch (error) {
       this.started = false;
       console.warn("Salesforce CDC listener is idle:", error instanceof Error ? error.message : error);
@@ -45,7 +46,7 @@ export class SalesforceEventListener {
 
       if (!recordId || !["CREATE", "UPDATE", "UNDELETE"].includes(changeType)) return;
       if (objectName === "Contact") await this.applyContactChange(recordId, changeType === "CREATE" ? "CREATE" : "UPDATE");
-      if (objectName === "Order__c") await this.applyOrderChange(recordId, changeType === "CREATE" ? "CREATE" : "UPDATE");
+      if (objectName === SALESFORCE_OBJECTS.order) await this.applyOrderChange(recordId, changeType === "CREATE" ? "CREATE" : "UPDATE");
     });
   }
 
@@ -93,8 +94,8 @@ export class SalesforceEventListener {
   private async applyOrderChange(recordId: string, operation: "CREATE" | "UPDATE"): Promise<void> {
     try {
       const record = await withSalesforce((conn) =>
-        conn.sobject("Order__c").retrieve(recordId, {
-          fields: ["Id", "Order_Number__c", "Amount__c", "Status__c", "Customer_Email__c", "LastModifiedDate"]
+        conn.sobject(SALESFORCE_OBJECTS.order).retrieve(recordId, {
+          fields: SALESFORCE_ORDER_FIELDS
         } as any)
       );
       const orders = await orderRepo.read();
@@ -116,7 +117,7 @@ export class SalesforceEventListener {
         direction: "SALESFORCE_TO_APP",
         operation,
         status: "SUCCESS",
-        message: "Applied Salesforce Order__c CDC change locally."
+        message: `Applied Salesforce ${SALESFORCE_OBJECTS.order} CDC change locally.`
       });
       eventBus.emit("data-change", { entity: "Order" });
     } catch (error: any) {
@@ -126,7 +127,7 @@ export class SalesforceEventListener {
         direction: "SALESFORCE_TO_APP",
         operation,
         status: "FAILED",
-        message: error.message ?? "Failed to apply Order__c CDC event."
+        message: error.message ?? `Failed to apply ${SALESFORCE_OBJECTS.order} CDC event.`
       });
     }
   }

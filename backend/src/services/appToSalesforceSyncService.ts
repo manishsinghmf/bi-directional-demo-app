@@ -5,6 +5,7 @@ import { orderToSalesforce } from "../mappers/orderMapper.js";
 import { withSalesforce } from "./salesforceClient.js";
 import { logSyncEvent } from "./syncLogger.js";
 import { eventBus } from "./eventBus.js";
+import { SALESFORCE_OBJECTS } from "../config/salesforceSchema.js";
 
 const escapeSoql = (value: string) => value.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
@@ -86,12 +87,12 @@ export class AppToSalesforceSyncService {
 
       const result = await withSalesforce(async (conn) => {
         if (order.salesforceOrderId) {
-          await conn.sobject("Order__c").update({ Id: order.salesforceOrderId, ...orderToSalesforce(order) });
-          return { id: order.salesforceOrderId, message: "Updated Salesforce Order__c." };
+          await conn.sobject(SALESFORCE_OBJECTS.order).update({ Id: order.salesforceOrderId, ...orderToSalesforce(order) });
+          return { id: order.salesforceOrderId, message: `Updated Salesforce ${SALESFORCE_OBJECTS.order}.` };
         }
-        const created = await conn.sobject("Order__c").create(orderToSalesforce(order));
+        const created = await conn.sobject(SALESFORCE_OBJECTS.order).create(orderToSalesforce(order));
         if (!created.success) throw new Error(created.errors?.join(", ") || "Order creation failed.");
-        return { id: created.id, message: "Created Salesforce Order__c." };
+        return { id: created.id, message: `Created Salesforce ${SALESFORCE_OBJECTS.order}.` };
       });
 
       const orders = await orderRepo.read();
@@ -127,7 +128,9 @@ export class AppToSalesforceSyncService {
   async deleteSalesforceRecord(entity: "Customer" | "Order", localId: string, salesforceId: string): Promise<void> {
     if (!salesforceId) return;
     try {
-      await withSalesforce((conn) => conn.sobject(entity === "Customer" ? "Contact" : "Order__c").destroy(salesforceId));
+      await withSalesforce((conn) =>
+        conn.sobject(entity === "Customer" ? SALESFORCE_OBJECTS.contact : SALESFORCE_OBJECTS.order).destroy(salesforceId)
+      );
       await logSyncEvent({
         entityType: entity,
         entityId: localId,

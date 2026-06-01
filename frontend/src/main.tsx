@@ -15,6 +15,7 @@ import {
   createTheme
 } from "@mui/material";
 import CloudDoneIcon from "@mui/icons-material/CloudDone";
+import LoginIcon from "@mui/icons-material/Login";
 import LinkOffIcon from "@mui/icons-material/LinkOff";
 import { api } from "./services/api";
 import { Dashboard } from "./pages/Dashboard";
@@ -30,6 +31,7 @@ function App() {
   const [page, setPage] = useState<Page>("dashboard");
   const [refreshKey, setRefreshKey] = useState(0);
   const [events, setEvents] = useState<LiveCdcEvent[]>([]);
+  const [salesforceConnected, setSalesforceConnected] = useState(false);
   const [snack, setSnack] = useState<{ message: string; severity: "success" | "info" | "warning" | "error" } | null>(null);
 
   const theme = useMemo(
@@ -62,12 +64,20 @@ function App() {
     return () => source.close();
   }, []);
 
+  useEffect(() => {
+    api
+      .authStatus()
+      .then((status) => setSalesforceConnected(status.connected))
+      .catch(() => setSalesforceConnected(false));
+  }, [refreshKey]);
+
   const connect = () => {
     window.location.href = api.loginUrl;
   };
 
   const disconnect = async () => {
     await api.disconnect();
+    setSalesforceConnected(false);
     setSnack({ message: "Salesforce disconnected", severity: "info" });
     setRefreshKey((value) => value + 1);
   };
@@ -81,12 +91,20 @@ function App() {
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
             Salesforce Bi-Directional Sync
           </Typography>
-          <Button startIcon={<CloudDoneIcon />} variant="contained" onClick={connect}>
-            Connect Salesforce
-          </Button>
-          <Button startIcon={<LinkOffIcon />} color="inherit" onClick={disconnect}>
-            Disconnect
-          </Button>
+          {salesforceConnected ? (
+            <>
+              <Button startIcon={<CloudDoneIcon />} variant="outlined" color="success" disableRipple sx={{ cursor: "default" }}>
+                Salesforce Connected
+              </Button>
+              <Button startIcon={<LinkOffIcon />} variant="contained" color="error" onClick={disconnect}>
+                Disconnect
+              </Button>
+            </>
+          ) : (
+            <Button startIcon={<LoginIcon />} variant="contained" onClick={connect}>
+              Connect Salesforce
+            </Button>
+          )}
         </Toolbar>
         <Tabs value={page} onChange={(_, value) => setPage(value)} variant="scrollable" sx={{ px: 2, bgcolor: "background.paper" }}>
           <Tab label="Dashboard" value="dashboard" />

@@ -1,4 +1,4 @@
-import { Customer, LiveCdcEvent, Order, SyncEvent, SyncStatusSummary } from "../types";
+import { Customer, LiveCdcEvent, Order, SalesforceAuthStatus, SyncEvent, SyncStatusSummary } from "../types";
 
 export const API_BASE = import.meta.env.VITE_API_BASE ?? "http://localhost:4000";
 
@@ -28,6 +28,7 @@ export const api = {
   deleteOrder: (id: string) => request<void>(`/api/orders/${id}`, { method: "DELETE" }),
   syncEvents: () => request<SyncEvent[]>("/api/sync/events"),
   syncStatus: () => request<SyncStatusSummary>("/api/sync/status"),
+  authStatus: () => request<SalesforceAuthStatus>("/auth/salesforce/status"),
   disconnect: () => request<{ ok: boolean }>("/auth/salesforce/disconnect", { method: "POST" }),
   liveEventsUrl: `${API_BASE}/api/events/live`
 };
