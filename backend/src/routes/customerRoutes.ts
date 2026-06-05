@@ -13,6 +13,8 @@ const schema = z.object({
   phone: z.string().optional().default("")
 });
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
 export const customerRoutes = Router();
 
 customerRoutes.get("/", async (_req, res, next) => {
@@ -27,6 +29,12 @@ customerRoutes.post("/", async (req, res, next) => {
   try {
     const payload = schema.parse(req.body);
     const now = new Date().toISOString();
+    const customers = await customerRepo.read();
+    const emailExists = customers.some((item) => normalizeEmail(item.email) === normalizeEmail(payload.email));
+    if (emailExists) {
+      return res.status(409).json({ message: "A customer with this email already exists." });
+    }
+
     const customer: Customer = {
       id: uuid(),
       salesforceContactId: "",
@@ -37,7 +45,6 @@ customerRoutes.post("/", async (req, res, next) => {
       createdAt: now,
       updatedAt: now
     };
-    const customers = await customerRepo.read();
     await customerRepo.write([customer, ...customers]);
     eventBus.emit("data-change", { entity: "Customer" });
     void appToSalesforceSyncService.syncCustomer(customer, "CREATE");
@@ -53,6 +60,11 @@ customerRoutes.put("/:id", async (req, res, next) => {
     const customers = await customerRepo.read();
     const existing = customers.find((item) => item.id === req.params.id);
     if (!existing) return res.status(404).json({ message: "Customer not found." });
+    const emailExists = customers.some((item) => item.id !== existing.id && normalizeEmail(item.email) === normalizeEmail(payload.email));
+    if (emailExists) {
+      return res.status(409).json({ message: "A customer with this email already exists." });
+    }
+
     const now = new Date().toISOString();
     const updated: Customer = { ...existing, ...payload, phone: payload.phone ?? "", syncStatus: "Syncing", lastModified: now, updatedAt: now };
     await customerRepo.write(customers.map((item) => (item.id === updated.id ? updated : item)));
